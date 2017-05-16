@@ -1,5 +1,5 @@
 def checkProxy(proxyUrl):
-
+    #proxyUrl:   http://10.1.22.20:8080
     ip = proxyUrl[proxyUrl.find('//') + 2:proxyUrl.rfind(':')]
     port = proxyUrl[proxyUrl.rfind(':') + 1:]
 
