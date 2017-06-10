@@ -1,0 +1,116 @@
+# -*- coding: UTF-8 -*-
+__author__ = 'jiang'
+
+import multiprocessing
+from multiprocessing import Pool
+import thread
+import time
+import random
+import traceback
+from selenium import webdriver
+import os
+import threading
+
+queues = []
+def func(msg,queues):
+    count = len(queues)
+    for i in range(0,10):
+        webdriver = getDriver(queues)
+        threading.Thread(target=startThread, args=(queues,webdriver,msg)).start()
+    while len(queues) != count:
+        pass
+    print str(len(queues)), '........'
+    for d in queues:
+        d.quit()
+
+def startThread(queues,webdriver,msg):
+
+    webdriver.get('https://book.douban.com/subject/27009472/comments/')
+    print webdriver.get_cookies()
+    print 'result='+webdriver.title
+    try:
+        setDrivers(queues, webdriver)
+    except Exception, e:
+        traceback.print_exc()
+        setDrivers(queues, webdriver)
+
+def printMsg(queues):
+    pool_size = multiprocessing.cpu_count()
+    pool = multiprocessing.Pool(processes=pool_size)
+    for i in xrange(4 ):
+        msg = "hello %d" % (i)
+        pool.apply_async(func, (msg,queues))  # 维持执行的进程总数为processes，当一个进程执行完毕后会添加新的进程进去
+    pool.close()
+    pool.join()  # 调用join之前，先调用close函数，否则会出错。执行完close后不会有新的进程加入到pool,join函数等待所有子进程结束
+    print "Sub-process(es) done."
+
+def getProxies():
+    f = open('proxy_ip_2.txt')
+    line = f.readline()
+    proxies = []
+    while line:
+        lines = line.split(' ')
+        port = lines[1][0:len(lines[1]) - 1]
+        proxies.append(
+            lines[0] + ':' + port
+            # {
+            #     'http':'http://' + lines[0] + ':' + port
+            #     # 'https':'https://' + lines[0] + ':' + port
+            # }
+        )
+        line = f.readline()
+    f.close()
+
+
+    return proxies[random.randint(0, len(proxies)-1)]
+
+
+import threading
+mutex = threading.Lock()
+def initWebdriver(queues):
+    queuecount = 2
+    for i in range(0,queuecount):
+        proxies = getProxies()
+        # chrome_options = webdriver.ChromeOptions()
+        # chrome_options.add_argument('--proxy-server={0}'.format(proxies))
+        # driver = webdriver.Chrome(executable_path='/Users/jiang/desktop/chromedriver',chrome_options=chrome_options)
+
+        service_args = [
+            '--proxy=' + proxies,
+            '--proxy-type=http'
+        ]
+        print str(service_args)
+        driver = webdriver.PhantomJS(service_args=service_args)
+        queues.append(driver)
+
+
+
+def getDriver(queues):
+    mutex.acquire()
+    try:
+        while len(queues) <= 0:
+            pass
+        driver = queues.pop()
+        # print str(len(queues)),str(driver)
+        return driver
+    except Exception,e:
+        traceback.print_exc()
+        return None
+    finally:
+        mutex.release()
+
+def setDrivers(queues,driver):
+
+    try:
+        driver.delete_all_cookies()
+        queues.append(driver)
+        # print str(len(queues)),'--------------'
+    except Exception,e:
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    initWebdriver(queues=queues)
+    printMsg(queues)
+
+
