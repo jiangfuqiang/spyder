@@ -1,0 +1,145 @@
+# -*- coding: UTF-8 -*-
+__author__ = 'jiang'
+import traceback
+import requests
+import string
+from pyquery import PyQuery as pq
+import time
+import random
+import urllib2
+proxycheck = 'http://web.chacuo.net/netproxycheck'
+
+def writeFile(ip,port):
+    f = open('proxy_ip_1.txt','a')
+    f.write(ip + ' ' + port + '\n')
+    f.close()
+
+urls = [
+        # 'http://www.kuaidaili.com/free/outtr/%d/',
+        'http://www.kuaidaili.com/free/outha/%d/',
+        # 'http://www.kuaidaili.com/free/inha/%d/'
+    ]
+
+def getCheckHeaders():
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.81 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Encoding": "gzip, deflate, sdch, br",
+        "Accept-Language": "zh-CN, zh; q=0.8, en; q=0.6",
+        "Cookie": "__cfduid=d0aca8fa3f794f5bcd14a1ee1325803781494843190; bdshare_firstime=%d;bid=%s" % (int(time.time()),"".join(random.sample(string.ascii_letters + string.digits, 11)))
+    }
+    return headers
+
+def checkProxy(proxyUrl):
+
+    ip = proxyUrl[proxyUrl.find('//') + 2:proxyUrl.rfind(':')]
+    port = proxyUrl[proxyUrl.rfind(':') + 1:]
+
+    proxy = urllib2.ProxyHandler({'http':ip+':'+port})
+    opener = urllib2.build_opener(proxy)
+    urllib2.install_opener(opener)
+    try:
+        html = urllib2.urlopen('http://1212.ip138.com/ic.asp')
+        if html.msg == 'OK':
+            print 'succes',proxyUrl
+            return True
+        else:
+            return False
+    except Exception, e:
+        traceback.print_exc()
+        return False
+
+    # data = {'data': ip, 'type': 'proxycheck', 'arg': 'p=' + str(port) + "_t=1_o=3"}
+    # rq = requests.post(proxycheck, data= data,
+    #                    headers=getCheckHeaders())
+    # if rq.status_code == 200:
+    #     jsonText = rq.json()
+    #     jsonData = jsonText['data'][0]
+    #     if jsonData.find(u'失败') > 0:
+    #         return False
+    #     print 'success: ',ip,port
+    #     return True
+    # return False
+
+def parsekuaidaili(url):
+
+    pageSize = 1631
+    page = 3
+    proxies = []
+    while True:
+        turl = url%page
+        if page > pageSize:
+            break
+        try:
+            rq = requests.get(turl,headers=getCheckHeaders())
+            print turl,str(rq.status_code)
+            if rq.status_code == 200:
+                text = rq.text
+                pq_text = pq(text)
+                listDiv = pq_text('#list')
+                pq_div = pq(listDiv)
+                trs = pq_div('tr')
+                if len(trs) > 0:
+                    for tr in trs:
+                        pq_tr = pq(tr)
+                        tds = pq_tr('td')
+                        if tds and len(tds) > 0:
+                            ip = pq(tds[0]).text()
+                            port = pq(tds[1]).text()
+                            print ip,port
+                            if checkProxy('http://' + ip + ':' + port):
+                                try:
+                                    writeFile(ip,port)
+                                except Exception,e:
+                                    traceback.print_exc()
+                                proxies.append(
+                                    {
+                                        'http':'http://' + ip + ':' + port,
+                                        'https':'https://' + ip + ':' + port
+                                    }
+                                )
+
+        except Exception,e:
+            traceback.print_exc()
+        finally:
+            page += 1
+for url in urls:
+    parsekuaidaili(url)
+
+
+import os
+import time
+import requests
+
+
+#num获取num页 国内高匿ip的网页中代理数据
+def fetch_proxy(num):
+    #修改当前工作文件夹
+    api = 'http://www.xicidaili.com/wt/'
+    header = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_3) AppleWebKit/'
+                  '537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36'}
+    fp = open('proxy_ip.txt', 'a+')
+    for i in range(num+1):
+        api = api.format(1)
+        respones = requests.get(url=api, headers=header)
+        pq_text = pq(respones.text)
+        container = pq_text('tr')
+        for tag in container:
+            try:
+                if pq(tag).attr("class") != 'odd':
+                    continue
+                con_soup = pq(tag)
+                td_list = con_soup('td')
+                ip = str(pq(td_list[1]).text())
+                port = str(pq(td_list[2]).text())
+                IPport = ip + ' ' + port
+                if checkProxy('http://' + ip + ':' + port):
+                    fp.write(IPport+'\n')
+            except Exception as e:
+                print('No IP！')
+                traceback.print_exc()
+        time.sleep(1)
+    fp.close()
+
+# fetch_proxy(100)
